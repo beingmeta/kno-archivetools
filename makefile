@@ -1,5 +1,5 @@
-PKGNAME	          = rocksdb # Edit to adapt
-LIBNAME	          = rocksdb
+PKGNAME	          = archivetools # Edit to adapt
+LIBNAME	          = archivetools
 KNOCONFIG         = knoconfig
 KNOBUILD          = knobuild
 
@@ -20,8 +20,8 @@ INIT_LDFLAGS 	::= ${LDFLAGS}
 KNO_CFLAGS	::= -I. -fPIC $(shell ${KNOCONFIG} cflags)
 KNO_LDFLAGS	::= -fPIC $(shell ${KNOCONFIG} ldflags)
 KNO_LIBS	::= $(shell ${KNOCONFIG} libs)
-MODULE_CFLAGS   ::= $(shell ./etc/getcflags ${LIBNAME})
-MODULE_LDFLAGS  ::= $(shell ./etc/getlibflags ${LIBNAME})
+MODULE_CFLAGS   ::= $(shell ./etc/getcflags libarchive)
+MODULE_LDFLAGS  ::= $(shell ./etc/getlibflags libarchive)
 SUDO  		::= $(shell which sudo)
 
 CFLAGS		  = ${INIT_CFLAGS} ${MODULE_CFLAGS} ${KNO_CFLAGS} ${XCFLAGS}
@@ -60,22 +60,22 @@ normal:
 
 # Basic targets (Edit to adapt)
 
-rocksdb.o: rocksdb.c makefile
+archivetools.o: archivetools.c makefile
 	@$(CC) $(CFLAGS) -D_FILEINFO="\"$(shell u8_fileinfo ./$< $(dirname $(pwd))/)\"" -o $@ -c $<
-	@$(MSG) CC "(ROCKSDB)" $@
-rocksdb.so: rocksdb.o
-	@$(MKSO) $(LDFLAGS) -o $@ rocksdb.o ${LDFLAGS}
+	@$(MSG) CC "(ARCHIVETOOLS)" $@
+archivetools.so: archivetools.o
+	@$(MKSO) $(LDFLAGS) -o $@ archivetools.o ${LDFLAGS}
 	@$(MSG) MKSO  $@ $<
 	@ln -sf $(@F) $(@D)/$(@F).${KNO_MAJOR}
-rocksdb.dylib: rocksdb.c makefile
+archivetools.dylib: archivetools.c makefile
 	@$(MACLIBTOOL) -install_name \
 		`basename $(@F) .dylib`.${KNO_MAJOR}.dylib \
 		${CFLAGS} ${LDFLAGS} -o $@ $(DYLIB_FLAGS) \
-		rocksdb.c
+		archivetools.c
 	@$(MSG) MACLIBTOOL  $@ $<
 
-TAGS: rocksdb.c
-	etags -o TAGS rocksdb.c
+TAGS: archivetools.c
+	etags -o TAGS archivetools.c
 
 # Other targets
 
@@ -83,7 +83,7 @@ ${CMODULES}:
 	install -d $@
 
 install: build ${CMODULES}
-	${SUDO} u8_install_shared ${PKG_NAME}.${libsuffix} ${CMODULES} ${FULL_VERSION} "${SYSINSTALL}"
+	${SUDO} u8_install_shared ${PKGNAME}.${libsuffix} ${CMODULES} ${FULL_VERSION} "${SYSINSTALL}"
 
 clean:
 	rm -f *.o *.${libsuffix}
@@ -129,21 +129,21 @@ all_buildinfo: buildinfo
 
 # RPM packaging
 
-dist/kno-${PKG_NAME}.spec: dist/kno-${PKG_NAME}.spec.in makefile
-	u8_xsubst dist/kno-${PKG_NAME}.spec dist/kno-${PKG_NAME}.spec.in \
+dist/kno-${PKGNAME}.spec: dist/kno-${PKGNAME}.spec.in makefile
+	u8_xsubst dist/kno-${PKGNAME}.spec dist/kno-${PKGNAME}.spec.in \
 		"VERSION" "${FULL_VERSION}" \
-		"PKG_NAME" "${PKG_NAME}" && \
+		"PKG_NAME" "${PKGNAME}" && \
 	touch $@
-kno-${PKG_NAME}.tar: dist/kno-${PKG_NAME}.spec
-	git archive -o $@ --prefix=kno-${PKG_NAME}-${FULL_VERSION}/ HEAD
-	tar -f $@ -r dist/kno-${PKG_NAME}.spec
+kno-${PKGNAME}.tar: dist/kno-${PKGNAME}.spec
+	git archive -o $@ --prefix=kno-${PKGNAME}-${FULL_VERSION}/ HEAD
+	tar -f $@ -r dist/kno-${PKGNAME}.spec
 
-dist/rpms.ready: kno-${PKG_NAME}.tar
+dist/rpms.ready: kno-${PKGNAME}.tar
 	rpmbuild $(RPMFLAGS)  			\
 	   --define="_rpmdir $(RPMDIR)"			\
 	   --define="_srcrpmdir $(RPMDIR)" 		\
 	   --nodeps -ta 				\
-	    kno-${PKG_NAME}.tar && 	\
+	    kno-${PKGNAME}.tar && 	\
 	touch dist/rpms.ready
 dist/rpms.done: dist/rpms.ready
 	@if (test "$(GPGID)" = "none" || test "$(GPGID)" = "" ); then 			\
@@ -152,16 +152,16 @@ dist/rpms.done: dist/rpms.ready
 	     echo "Enter passphrase for '$(GPGID)':"; 		\
 	     rpm --addsign --define="_gpg_name $(GPGID)" 	\
 		--define="__gpg_sign_cmd $(RPMGPG)"		\
-		$(RPMDIR)/kno-${PKG_NAME}-${FULL_VERSION}*.src.rpm 		\
+		$(RPMDIR)/kno-${PKGNAME}-${FULL_VERSION}*.src.rpm 		\
 		$(RPMDIR)/*/kno*-@KNO_VERSION@-*.rpm; 	\
 	fi && touch dist/rpms.done;
-	@ls -l $(RPMDIR)/kno-${PKG_NAME}-${FULL_VERSION}-*.src.rpm \
+	@ls -l $(RPMDIR)/kno-${PKGNAME}-${FULL_VERSION}-*.src.rpm \
 		$(RPMDIR)/*/kno*-${FULL_VERSION}-*.rpm;
 
 rpms: dist/rpms.done
 
 cleanrpms:
-	rm -rf dist/rpms.done dist/rpms.ready kno-${PKG_NAME}.tar dist/kno-${PKG_NAME}.spec
+	rm -rf dist/rpms.done dist/rpms.ready kno-${PKGNAME}.tar dist/kno-${PKGNAME}.spec
 
 rpmupdate update-rpms freshrpms: cleanrpms
 	make cleanrpms
@@ -180,11 +180,11 @@ staging/alpine:
 staging/alpine/APKBUILD: dist/alpine/APKBUILD staging/alpine
 	cp dist/alpine/APKBUILD staging/alpine
 
-staging/alpine/kno-${PKG_NAME}.tar: staging/alpine
-	git archive --prefix=kno-${PKG_NAME}/ -o staging/alpine/kno-${PKG_NAME}.tar HEAD
+staging/alpine/kno-${PKGNAME}.tar: staging/alpine
+	git archive --prefix=kno-${PKGNAME}/ -o staging/alpine/kno-${PKGNAME}.tar HEAD
 
 dist/alpine.setup: staging/alpine/APKBUILD makefile ${STATICLIBS} \
-	staging/alpine/kno-${PKG_NAME}.tar
+	staging/alpine/kno-${PKGNAME}.tar
 	if [ ! -d ${APK_ARCH_DIR} ]; then mkdir -p ${APK_ARCH_DIR}; fi && \
 	( cd staging/alpine; \
 		abuild -P ${APKREPO} clean cleancache cleanpkg && \

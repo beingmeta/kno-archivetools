@@ -2,7 +2,7 @@
 
 LIBNAME=$1
 PROBE_NAMES=$@
-DEFAULT_LIBFLAGS=-l${LIBNAME}
+DEFAULT_LIBFLAGS=-l${LIBNAME#lib}
 
 if which pkg-config 1>/dev/null 2>/dev/null; then
     for name in ${PROBE_NAMES}; do
