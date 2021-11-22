@@ -6,6 +6,7 @@ KNOBUILD          = knobuild
 prefix		::= $(shell ${KNOCONFIG} prefix)
 libsuffix	::= $(shell ${KNOCONFIG} libsuffix)
 CMODULES	::= $(DESTDIR)$(shell ${KNOCONFIG} cmodules)
+INSTALLMODS	::= $(DESTDIR)$(shell ${KNOCONFIG} installmods)
 KNO_VERSION	::= $(shell ${KNOCONFIG} version)
 KNO_MAJOR	::= $(shell ${KNOCONFIG} major)
 KNO_MINOR	::= $(shell ${KNOCONFIG} minor)
@@ -13,7 +14,7 @@ PKG_VERSION     ::= $(shell u8_gitversion etc/mod_version)
 PKG_MAJOR       ::= $(shell echo ${PKG_VERSION} | cut -d. -f1)
 PKG_MINOR       ::= $(shell echo ${PKG_VERSION} | cut -d. -f2)
 PKG_PATCHLEVEL  ::= $(shell echo ${PKG_VERSION} | cut -d. -f3)
-FULL_VERSION    ::= ${KNO_MAJOR}.${PKG_VERSION}
+FULL_VERSION    ::= ${KNO_MAJOR}.${KNO_MINOR}.${PKG_VERSION}
 
 INIT_CFLAGS  	::= ${CFLAGS}
 INIT_LDFLAGS 	::= ${LDFLAGS}
@@ -27,7 +28,7 @@ SUDO  		::= $(shell which sudo)
 CFLAGS		  = ${INIT_CFLAGS} ${MODULE_CFLAGS} ${KNO_CFLAGS} ${XCFLAGS}
 LDFLAGS		  = ${INIT_LDFLAGS} ${MODULE_LDFLAGS} ${KNO_LDFLAGS} ${XLDFLAGS}
 MKSO		  = $(CC) -shared $(CFLAGS) $(LDFLAGS) $(LIBS)
-SYSINSTALL        = /usr/bin/install -c
+SYSINSTALL        = /usr/bin/install -c -m a+r,ug+w
 MSG		  = echo
 MACLIBTOOL	  = $(CC) -dynamiclib -single_module -undefined dynamic_lookup \
 			$(LDFLAGS)
@@ -79,11 +80,12 @@ TAGS: archivetools.c
 
 # Other targets
 
-${CMODULES}:
+${CMODULES} ${INSTALLMODS} ${INSTALLMODS}/io:
 	install -d $@
 
-install: build ${CMODULES}
-	${SUDO} u8_install_shared ${PKGNAME}.${libsuffix} ${CMODULES} ${FULL_VERSION} "${SYSINSTALL}"
+install: build ${CMODULES} ${INSTALLMODS}/io
+	${SUDO} u8_install_shared "${LIBNAME}.${libsuffix}" "${CMODULES}" "${FULL_VERSION}" "${SYSINSTALL}"
+	${SUDO} $(SYSINSTALL) io/filestream.scm $(INSTALLMODS)/io/filestream.scm
 
 clean:
 	rm -f *.o *.${libsuffix}
@@ -126,51 +128,6 @@ all_buildinfo: buildinfo
 	@echo "  MODULE_CFLAGS=$(MODULE_CFLAGS)";
 	@echo "  MODULE_LDFLAGS=$(MODULE_LDFLAGS)";
 	@echo "  SUDO=$(SUDO)";
-
-# RPM packaging
-
-dist/kno-${PKGNAME}.spec: dist/kno-${PKGNAME}.spec.in makefile
-	u8_xsubst dist/kno-${PKGNAME}.spec dist/kno-${PKGNAME}.spec.in \
-		"VERSION" "${FULL_VERSION}" \
-		"PKG_NAME" "${PKGNAME}" && \
-	touch $@
-kno-${PKGNAME}.tar: dist/kno-${PKGNAME}.spec
-	git archive -o $@ --prefix=kno-${PKGNAME}-${FULL_VERSION}/ HEAD
-	tar -f $@ -r dist/kno-${PKGNAME}.spec
-
-dist/rpms.ready: kno-${PKGNAME}.tar
-	rpmbuild $(RPMFLAGS)  			\
-	   --define="_rpmdir $(RPMDIR)"			\
-	   --define="_srcrpmdir $(RPMDIR)" 		\
-	   --nodeps -ta 				\
-	    kno-${PKGNAME}.tar && 	\
-	touch dist/rpms.ready
-dist/rpms.done: dist/rpms.ready
-	@if (test "$(GPGID)" = "none" || test "$(GPGID)" = "" ); then 			\
-	    touch dist/rpms.done;				\
-	else 						\
-	     echo "Enter passphrase for '$(GPGID)':"; 		\
-	     rpm --addsign --define="_gpg_name $(GPGID)" 	\
-		--define="__gpg_sign_cmd $(RPMGPG)"		\
-		$(RPMDIR)/kno-${PKGNAME}-${FULL_VERSION}*.src.rpm 		\
-		$(RPMDIR)/*/kno*-@KNO_VERSION@-*.rpm; 	\
-	fi && touch dist/rpms.done;
-	@ls -l $(RPMDIR)/kno-${PKGNAME}-${FULL_VERSION}-*.src.rpm \
-		$(RPMDIR)/*/kno*-${FULL_VERSION}-*.rpm;
-
-rpms: dist/rpms.done
-
-cleanrpms:
-	rm -rf dist/rpms.done dist/rpms.ready kno-${PKGNAME}.tar dist/kno-${PKGNAME}.spec
-
-rpmupdate update-rpms freshrpms: cleanrpms
-	make cleanrpms
-	make -s dist/rpms.done
-
-dist/rpms.installed: dist/rpms.done
-	sudo rpm -Uvh ${RPMDIR}/*.rpm && sudo rpm -Uvh ${RPMDIR}/${ARCH}/*.rpm && touch $@
-
-installrpms install-rpms: dist/rpms.installed
 
 # Alpine packaging
 
